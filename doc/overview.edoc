@@ -1,0 +1,39 @@
+@author Alex Wilson <alex@uq.edu.au>
+@title elibgit
+@doc Erlang port bindings for libgit2.
+
+Libgit2 is a portable, pure C implementation of the Git core methods provided as a re-entrant linkable library. This OTP application, elibgit, provides Erlang bindings for libgit2 implemented by way of a port and external C binary.
+
+As libgit2 is still in heavy development, I have had some previous issues with the re-entrancy and thread safety support. Port bindings are safe against these issues, but this comes at the cost of per-call marshalling and de-marshalling overheads. If you are looking for safe, straightfoward bindings that can't crash BEAM, then this is your solution. But if you need to open lots of respositories at once or performance is critical to your application, this definitely is not!
+
+<h2>Reading from the Git repository</h2>
+
+<blockquote><code>
+1> {ok, Git} = elibgit:open("./elibgit").
+{ok,{elibgit,<0.33.0>}}
+
+2> Git:get_ref("refs/heads/master").
+{ok,<<"22d20a6646498c62cdeba2112a399ef973b235ef">>}
+
+3> Git:get_commit("22d20a6646498c62cdeba2112a399ef973b235ef").
+{ok,{gitcommit,<<"Documentation fixes\n">>,
+               [<<"a682625ab1d1ba0c6d87879e4009d2591d0d1193">>],
+               <<"Alex Wilson">>,<<...>>,
+               <<"a3919ff1d00d7f31623cc5ada075d7aae4d793ba">>}}
+
+4> Git:get_tree("a3919ff1d00d7f31623cc5ada075d7aae4d793ba").
+{ok,[{gitent,tree,
+             <<"ec334488c583e06b6640e4ad2c6082ccf32cd6e8">>,
+             <<"elibgitd">>},
+     {gitent,tree,<<"43a6d3ae3696375c55533d5ad9711d85c52499d1">>,
+             <<"include">>},
+     {gitent,blob,<<"672a9f841f06b44b6f361bec672ebc2cdda0c708">>,
+             <<"rebar">>},
+     {gitent,blob,<<"49af3cc115703b225d9c22a4ea07c8315c8c6d6d">>,
+             <<"rebar.config">>},
+     {gitent,tree,<<"2cbe78a7262b0c43f39e4aaf9c75170e9fbce25d">>,
+             <<"src">>}]}
+
+5> Git:get_blob("49af3cc115703b225d9c22a4ea07c8315c8c6d6d").
+{ok,<<"{deps, []}.\n{sub_dirs, []}.\n{port_env, [{\"CFLAGS\", \"$CFLAGS -I/opt/local/include\"},\n           {\"LDFLAGS\", \""...>>}
+</code></blockquote>
