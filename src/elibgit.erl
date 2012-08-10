@@ -40,6 +40,9 @@
 %% api
 %% ===
 
+%% @doc Open a new elibgit instance.
+%% Path should contain the full path to the repository.
+-spec elibgit:open(Path :: string() | binary()) -> {ok, elibgit()} | {error, term()}.
 open(Path) ->
 	case gen_server:start_link(?MODULE, [Path], []) of
 		{ok, Pid} ->
@@ -48,33 +51,55 @@ open(Path) ->
 			Other
 	end.
 
+
+%% @doc Resolves a 'ref' in the repository.
+%% This should be the fully qualified reference name, e.g. <code>refs/heads/master</code>, not
+%% just <code>master</code>.
+-spec elibgit:get_ref(Ref :: string() | binary(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 get_ref(Ref, {elibgit, Pid}) ->
 	gen_server:call(Pid, {get_ref, Ref}).
 
+
+%% @doc Retrieves a tree object.
+-spec elibgit:get_tree(Oid :: git_oid(), Inst :: elibgit()) -> {ok, [git_tree_entry()]} | {error, term()}.
 get_tree(Oid, {elibgit, Pid}) ->
 	gen_server:call(Pid, {get_tree, Oid}).
 
+
+%% @doc Retrieves a commit object.
+-spec elibgit:get_commit(Oid :: git_oid(), Inst :: elibgit()) -> {ok, git_commit()} | {error, term()}.
 get_commit(Oid, {elibgit, Pid}) ->
 	gen_server:call(Pid, {get_commit, Oid}).
 
+%% @doc Retrieves the data inside a blob object.
+-spec elibgit:get_blob(Oid :: git_oid(), Inst :: elibgit()) -> {ok, binary()} | {error, term()}.
 get_blob(Oid, {elibgit, Pid}) ->
 	gen_server:call(Pid, {get_blob, Oid}).
 
+%% @doc Creates a new blob in the respository.
+-spec elibgit:create_blob(Data :: binary(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 create_blob(Data, {elibgit, Pid}) ->
 	gen_server:call(Pid, {create_blob, Data}).
 
+%% @doc Builds a new tree using a basis and list of operations.
+-spec elibgit:build_tree(StartingPoint :: git_oid() | empty, Removes :: [git_remove_op()], Inserts :: [git_insert_op()], Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 build_tree(StartingPoint, Removes, Inserts, {elibgit, Pid}) ->
 	gen_server:call(Pid, {build_tree, StartingPoint, Removes, Inserts}).
 
+%% @doc Creates a new commit and updates a ref to point at it.
+-spec elibgit:create_commit(Ref :: filename(), Author :: string() | binary(), Email :: string() | binary(), Message :: string() | binary(), Parents :: [git_oid()], Tree :: git_oid(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 create_commit(Ref, Author, Email, Message, Parents, Tree, {elibgit, Pid}) ->
 	gen_server:call(Pid, {create_commit, Ref, Author, Email, Message, Parents, Tree}).
 
+%% @doc Closes a repository instance.
+-spec elibgit:close(Inst :: elibgit()) -> ok | {error, term()}.
 close({elibgit, Pid}) ->
 	gen_server:cast(Pid, close).
 
 %% gen_server stuff
 %% ===
 
+%% @private
 init([Path]) ->
 	process_flag(trap_exit, true),
 	OsPath = case os:getenv("PATH") of
@@ -164,6 +189,7 @@ cat_inserts(Bin, List) ->
 	NewBin = <<Bin/binary, NameLen:32/big, NameBin/binary, OidBin/binary, Attrs:32/big>>,
 	cat_inserts(NewBin, Rest).
 
+%% @private
 handle_call({create_commit, Ref, Author, Email, Message, Parents, Tree}, _From, Port) ->
 	TreeBin = check_oid(Tree),
 	NParents = length(Parents),
@@ -327,6 +353,7 @@ handle_call({get_ref, Ref}, _From, Port) ->
 		{reply, {error, timeout}, Port}
 	end.
 
+%% @private
 handle_cast(close, Port) ->
 	Port ! {self(), close},
 	receive
@@ -337,14 +364,17 @@ handle_cast(close, Port) ->
 handle_cast(_, Port) ->
 	{noreply, Port}.
 
+%% @private
 handle_info({'EXIT', Port, _Reason}, Port) ->
 	{stop, port_terminated, Port};
 
 handle_info(_, Port) ->
 	{noreply, Port}.
 
+%% @private
 terminate(_Reason, _Dicts) ->
 	ok.
 
+%% @private
 code_change(_OldVsn, Dicts, _Extra) ->
 	{ok, Dicts}.
