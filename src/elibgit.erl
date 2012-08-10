@@ -77,7 +77,26 @@ close({elibgit, Pid}) ->
 
 init([Path]) ->
 	process_flag(trap_exit, true),
-	case os:find_executable("elibgitd") of
+	OsPath = case os:getenv("PATH") of
+		false ->
+			[".", "./priv"];
+		OtherOs ->
+			[".", "./priv", OtherOs]
+	end,
+	WithPriv = case code:priv_dir(elibgit) of
+		{error, _} ->
+			OsPath;
+		Other ->
+			[Other] ++ OsPath
+	end,
+	FindPath = lists:foldl(fun(P, Acc) ->
+		if length(Acc) =:= 0 ->
+			P;
+		true ->
+			P ++ ":" ++ Acc
+		end
+	end, "", WithPriv),
+	case os:find_executable("elibgitd", FindPath) of
 		false ->
 			{error, elibgitd_notfound};
 		Exec ->
