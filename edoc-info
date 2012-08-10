@@ -1,0 +1,3 @@
+{application,elibgit}.
+{packages,[]}.
+{modules,[elibgit]}.
