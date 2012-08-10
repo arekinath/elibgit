@@ -1,8 +1,3 @@
--module(elibgit).
--behaviour(gen_server).
-
--export([open/1, get_ref/2, get_tree/2, get_commit/2, get_blob/2, create_blob/2, build_tree/4, create_commit/7, close/1]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 %%
 %% elibgit
 %% erlang external port bindings for libgit2
@@ -32,6 +27,12 @@
 %% (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 %% SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%
+
+-module(elibgit).
+-behaviour(gen_server).
+
+-export([open/1, get_ref/2, get_tree/2, get_commit/2, get_blob/2, create_blob/2, build_tree/4, create_commit/7, close/1]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("elibgit.hrl").
 -include("git_protocol.hrl").
