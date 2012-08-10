@@ -1,0 +1,7 @@
+doc/*.css
+doc/*.html
+doc/*.png
+doc/*/*
+ebin
+deps
+
