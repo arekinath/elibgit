@@ -10,30 +10,30 @@ As libgit2 is still in heavy development, I have had some previous issues with t
 
 <blockquote><code>
 1> {ok, Git} = elibgit:open("./elibgit").
-{ok,{elibgit,<0.33.0>}}
+{ok,{elibgit,&lt;0.33.0&gt;}}
 
 2> Git:get_ref("refs/heads/master").
-{ok,<<"22d20a6646498c62cdeba2112a399ef973b235ef">>}
+{ok,&lt;&lt;"22d20a6646498c62cdeba2112a399ef973b235ef"&gt;&gt;}
 
 3> Git:get_commit("22d20a6646498c62cdeba2112a399ef973b235ef").
-{ok,{gitcommit,<<"Documentation fixes\n">>,
-               [<<"a682625ab1d1ba0c6d87879e4009d2591d0d1193">>],
-               <<"Alex Wilson">>,<<...>>,
-               <<"a3919ff1d00d7f31623cc5ada075d7aae4d793ba">>}}
+{ok,{gitcommit,&lt;&lt;"Documentation fixes\n"&gt;&gt;,
+               [&lt;&lt;"a682625ab1d1ba0c6d87879e4009d2591d0d1193"&gt;&gt;],
+               &lt;&lt;"Alex Wilson"&gt;&gt;,&lt;&lt;...&gt;&gt;,
+               &lt;&lt;"a3919ff1d00d7f31623cc5ada075d7aae4d793ba"&gt;&gt;}}
 
 4> Git:get_tree("a3919ff1d00d7f31623cc5ada075d7aae4d793ba").
 {ok,[{gitent,tree,
-             <<"ec334488c583e06b6640e4ad2c6082ccf32cd6e8">>,
-             <<"elibgitd">>},
-     {gitent,tree,<<"43a6d3ae3696375c55533d5ad9711d85c52499d1">>,
-             <<"include">>},
-     {gitent,blob,<<"672a9f841f06b44b6f361bec672ebc2cdda0c708">>,
-             <<"rebar">>},
-     {gitent,blob,<<"49af3cc115703b225d9c22a4ea07c8315c8c6d6d">>,
-             <<"rebar.config">>},
-     {gitent,tree,<<"2cbe78a7262b0c43f39e4aaf9c75170e9fbce25d">>,
-             <<"src">>}]}
+             &lt;&lt;"ec334488c583e06b6640e4ad2c6082ccf32cd6e8"&gt;&gt;,
+             &lt;&lt;"elibgitd"&gt;&gt;},
+     {gitent,tree,&lt;&lt;"43a6d3ae3696375c55533d5ad9711d85c52499d1"&gt;&gt;,
+             &lt;&lt;"include"&gt;&gt;},
+     {gitent,blob,&lt;&lt;"672a9f841f06b44b6f361bec672ebc2cdda0c708"&gt;&gt;,
+             &lt;&lt;"rebar"&gt;&gt;},
+     {gitent,blob,&lt;&lt;"49af3cc115703b225d9c22a4ea07c8315c8c6d6d"&gt;&gt;,
+             &lt;&lt;"rebar.config"&gt;&gt;},
+     {gitent,tree,&lt;&lt;"2cbe78a7262b0c43f39e4aaf9c75170e9fbce25d"&gt;&gt;,
+             &lt;&lt;"src"&gt;&gt;}]}
 
 5> Git:get_blob("49af3cc115703b225d9c22a4ea07c8315c8c6d6d").
-{ok,<<"{deps, []}.\n{sub_dirs, []}.\n{port_env, [{\"CFLAGS\", \"$CFLAGS -I/opt/local/include\"},\n           {\"LDFLAGS\", \""...>>}
+{ok,&lt;&lt;"{deps, []}.\n{sub_dirs, []}.\n{port_env, [{\"CFLAGS\", \"$CFLAGS -I/opt/local/include\"},\n           {\"LDFLAGS\", \""...&gt;&gt;}
 </code></blockquote>
