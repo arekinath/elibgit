@@ -28,6 +28,17 @@
 %% SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%
 
+%% @doc This module contains methods for working with a Git respository instance.
+%%
+%% The repository instance is created with the {@link elibgit:open/1.} function,
+%% and then can be used with subscript notation, like so:
+%% <blockquote><pre>
+%% {ok, Git} = elibgit:open(Path),
+%% {ok, Oid} = Git:get_ref("...").
+%% </pre></blockquote>
+%%
+%% Once you are finished with an instance, you should call the {@link elibgit:close/1.}
+%% function to close the port and clean up resources.
 -module(elibgit).
 -behaviour(gen_server).
 
@@ -41,6 +52,7 @@
 %% ===
 
 %% @doc Open a new elibgit instance.
+%%
 %% Path should contain the full path to the repository.
 -spec elibgit:open(Path :: string() | binary()) -> {ok, elibgit()} | {error, term()}.
 open(Path) ->
@@ -53,6 +65,7 @@ open(Path) ->
 
 
 %% @doc Resolves a 'ref' in the repository.
+%%
 %% This should be the fully qualified reference name, e.g. <code>refs/heads/master</code>, not
 %% just <code>master</code>.
 -spec elibgit:get_ref(Ref :: string() | binary(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
@@ -76,17 +89,31 @@ get_commit(Oid, {elibgit, Pid}) ->
 get_blob(Oid, {elibgit, Pid}) ->
 	gen_server:call(Pid, {get_blob, Oid}).
 
-%% @doc Creates a new blob in the respository.
+%% @doc Creates a new blob in the respository, returning its new OID.
 -spec elibgit:create_blob(Data :: binary(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 create_blob(Data, {elibgit, Pid}) ->
 	gen_server:call(Pid, {create_blob, Data}).
 
 %% @doc Builds a new tree using a basis and list of operations.
+%%
+%% The new tree is initialised with identical contents to the StartingPoint tree. Then,
+%% the sub-trees and blobs specified in Removes are deleted, in order. Finally, the
+%% new sub-trees and blobs in Inserts are added in order, and the resulting tree
+%% written to the repository.
+%%
+%% For example, to take the existing tree <code>"abcd1234..."</code> and add a new file,
+%% <code>"bah.txt"</code>, you would first call {@link create_blob/2.} with the data
+%% to go inside it. Then, call <code>build_tree</code> with the StartingPoint as
+%% <code>"abcd1234..."</code>, no Remove operations, and one Insert operation:
+%% <code>{gitinsert, "bah.txt", "blob_oid_here", 0}</code>.
 -spec elibgit:build_tree(StartingPoint :: git_oid() | empty, Removes :: [git_remove_op()], Inserts :: [git_insert_op()], Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 build_tree(StartingPoint, Removes, Inserts, {elibgit, Pid}) ->
 	gen_server:call(Pid, {build_tree, StartingPoint, Removes, Inserts}).
 
 %% @doc Creates a new commit and updates a ref to point at it.
+%%
+%% Note that for non-bare repositories, updating the ref of the current branch like this
+%% is a really Bad Idea.
 -spec elibgit:create_commit(Ref :: filename(), Author :: string() | binary(), Email :: string() | binary(), Message :: string() | binary(), Parents :: [git_oid()], Tree :: git_oid(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 create_commit(Ref, Author, Email, Message, Parents, Tree, {elibgit, Pid}) ->
 	gen_server:call(Pid, {create_commit, Ref, Author, Email, Message, Parents, Tree}).

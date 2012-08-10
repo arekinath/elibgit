@@ -8,7 +8,7 @@ As libgit2 is still in heavy development, I have had some previous issues with t
 
 <h2>Reading from the Git repository</h2>
 
-<blockquote><code>
+<blockquote><pre>
 1> {ok, Git} = elibgit:open("./elibgit").
 {ok,{elibgit,&lt;0.33.0&gt;}}
 
@@ -36,4 +36,4 @@ As libgit2 is still in heavy development, I have had some previous issues with t
 
 5> Git:get_blob("49af3cc115703b225d9c22a4ea07c8315c8c6d6d").
 {ok,&lt;&lt;"{deps, []}.\n{sub_dirs, []}.\n{port_env, [{\"CFLAGS\", \"$CFLAGS -I/opt/local/include\"},\n           {\"LDFLAGS\", \""...&gt;&gt;}
-</code></blockquote>
+</pre></blockquote>

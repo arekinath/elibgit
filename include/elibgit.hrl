@@ -33,24 +33,24 @@
 -type elibgit() :: #elibgit{}.
 -type git_oid() :: string() | binary().
 
--record(gitent, {type :: atom(),
-				 oid :: git_oid(),
-				 name :: string() | binary()}).
+-record(gitent, {type=unknown :: atom(),
+				 oid=[] :: git_oid(),
+				 name=[] :: string() | binary()}).
 
--record(gitcommit, {msg :: binary(),
-					parents :: [git_oid()],
-					author :: binary(),
-					email :: binary(),
-					tree_oid :: git_oid()}).
+-record(gitcommit, {msg=nil :: binary(),
+					parents=[] :: [git_oid()],
+					author=nil :: binary(),
+					email=nil :: binary(),
+					tree_oid=[] :: git_oid()}).
 
 -type git_tree_entry() :: #gitent{}.
 -type git_commit() :: #gitcommit{}.
 -type filename() :: string() | binary().
 
--record(gitremove, {name :: filename()}).
--record(gitinsert, {name :: filename(),
-					  oid :: git_oid(),
-					  attrs :: number()}).
+-record(gitremove, {name="" :: filename()}).
+-record(gitinsert, {name="" :: filename(),
+					  oid="" :: git_oid(),
+					  attrs=0 :: number()}).
 
 -type git_remove_op() :: #gitremove{}.
 -type git_insert_op() :: #gitinsert{}.
