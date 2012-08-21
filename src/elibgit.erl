@@ -92,7 +92,7 @@ get_blob(Oid, {elibgit, Pid}) ->
 %% @doc Creates a new blob in the respository, returning its new OID.
 -spec elibgit:create_blob(Data :: binary(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 create_blob(Data, {elibgit, Pid}) ->
-	gen_server:call(Pid, {create_blob, Data}).
+	gen_server:call(Pid, {create_blob, Data}, 30000).
 
 %% @doc Builds a new tree using a basis and list of operations.
 %%
@@ -297,7 +297,7 @@ handle_call({create_blob, BlobData}, _From, Port) ->
 				_ ->
 					{reply, {error, unknown}, Port}
 			end
-	after 1000 ->
+	after 30000 ->
 		{reply, {error, timeout}, Port}
 	end;
 
