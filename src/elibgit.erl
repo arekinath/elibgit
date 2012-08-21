@@ -126,6 +126,8 @@ close({elibgit, Pid}) ->
 %% gen_server stuff
 %% ===
 
+-record(state, {port, exec, path}).
+
 %% @private
 init([Path]) ->
 	process_flag(trap_exit, true),
@@ -154,7 +156,7 @@ init([Path]) ->
 		Exec ->
 			Port = open_port({spawn_executable, Exec},
 						[binary, {packet, 4}, {args, [Path]}]),
-			{ok, Port}
+			{ok, #state{port=Port,exec=Exec,path=Path}}
 	end.
 
 git_type_to_atom(?GIT_OBJ_COMMIT) -> commit;
@@ -217,7 +219,9 @@ cat_inserts(Bin, List) ->
 	cat_inserts(NewBin, Rest).
 
 %% @private
-handle_call({create_commit, Ref, Author, Email, Message, Parents, Tree}, _From, Port) ->
+handle_call({create_commit, Ref, Author, Email, Message, Parents, Tree}, _From, State) ->
+	Port = State#state.port,
+
 	TreeBin = check_oid(Tree),
 	NParents = length(Parents),
 	POids = lists:foldl(fun(P, Bin) -> O = check_oid(P), <<Bin/binary, O/binary>> end, <<"">>, Parents),
@@ -245,18 +249,20 @@ handle_call({create_commit, Ref, Author, Email, Message, Parents, Tree}, _From, 
 			<<ErrCode:32/big-signed, Rest/binary>> = Data,
 			case ErrCode of
 				?GIT_OK ->
-					{reply, {ok, Rest}, Port};
+					{reply, {ok, Rest}, State};
 				?ERROR_STRERROR ->
 					<<Errno:32/big-signed, Message/binary>> = Rest,
-					{reply, {error, Errno, Message}, Port};
+					{reply, {error, Errno, Message}, State};
 				_ ->
-					{reply, {error, unknown}, Port}
+					{reply, {error, unknown}, State}
 			end
 	after 1000 ->
-		{reply, {error, timeout}, Port}
+		{reply, {error, timeout}, State}
 	end;
 
-handle_call({build_tree, Origin, Removes, Inserts}, _From, Port) ->
+handle_call({build_tree, Origin, Removes, Inserts}, _From, State) ->
+	Port = State#state.port,
+
 	NRemoves = length(Removes),
 	NInserts = length(Inserts),
 	Req = if is_atom(Origin) ->
@@ -280,18 +286,19 @@ handle_call({build_tree, Origin, Removes, Inserts}, _From, Port) ->
 			<<ErrCode:32/big-signed, Rest/binary>> = Data,
 			case ErrCode of
 				?GIT_OK ->
-					{reply, {ok, Rest}, Port};
+					{reply, {ok, Rest}, State};
 				?ERROR_STRERROR ->
 					<<Errno:32/big-signed, Message/binary>> = Rest,
-					{reply, {error, Errno, Message}, Port};
+					{reply, {error, Errno, Message}, State};
 				_ ->
-					{reply, {error, unknown}, Port}
+					{reply, {error, unknown}, State}
 			end
 	after 1000 ->
-		{reply, {error, timeout}, Port}
+		{reply, {error, timeout}, State}
 	end;
 
-handle_call({create_blob, BlobData}, _From, Port) ->
+handle_call({create_blob, BlobData}, _From, State) ->
+	Port = State#state.port,
 	BData = check_bin(BlobData),
 	Port ! {self(), {command, <<?OP_CREATEBLOB:8, BData/binary>>}},
 	receive
@@ -299,18 +306,19 @@ handle_call({create_blob, BlobData}, _From, Port) ->
 			<<ErrCode:32/big-signed, Rest/binary>> = Data,
 			case ErrCode of
 				?GIT_OK ->
-					{reply, {ok, Rest}, Port};
+					{reply, {ok, Rest}, State};
 				?ERROR_STRERROR ->
 					<<Errno:32/big-signed, Message/binary>> = Rest,
-					{reply, {error, Errno, Message}, Port};
+					{reply, {error, Errno, Message}, State};
 				_ ->
-					{reply, {error, unknown}, Port}
+					{reply, {error, unknown}, State}
 			end
 	after 30000 ->
-		{reply, {error, timeout}, Port}
+		{reply, {error, timeout}, State}
 	end;
 
-handle_call({get_blob, Oid}, _From, Port) ->
+handle_call({get_blob, Oid}, _From, State) ->
+	Port = State#state.port,
 	BOid = check_bin(Oid),
 	Port ! {self(), {command, <<?OP_GETBLOB:8, BOid/binary>>}},
 	receive
@@ -318,20 +326,21 @@ handle_call({get_blob, Oid}, _From, Port) ->
 			<<ErrCode:32/big-signed, Rest/binary>> = Data,
 			case ErrCode of
 				?GIT_OK ->
-					{reply, {ok, Rest}, Port};
+					{reply, {ok, Rest}, State};
 				?GIT_ENOTFOUND ->
-					{reply, {error, notfound}, Port};
+					{reply, {error, notfound}, State};
 				?ERROR_STRERROR ->
 					<<Errno:32/big-signed, Message/binary>> = Rest,
-					{reply, {error, Errno, Message}, Port};
+					{reply, {error, Errno, Message}, State};
 				_ ->
-					{reply, {error, unknown}, Port}
+					{reply, {error, unknown}, State}
 			end
 	after 1000 ->
-		{reply, {error, timeout}, Port}
+		{reply, {error, timeout}, State}
 	end;
 
-handle_call({get_commit, Oid}, _From, Port) ->
+handle_call({get_commit, Oid}, _From, State) ->
+	Port = State#state.port,
 	BOid = check_bin(Oid),
 	Port ! {self(), {command, <<?OP_GETCOMMIT:8, BOid/binary>>}},
 	receive
@@ -346,20 +355,21 @@ handle_call({get_commit, Oid}, _From, Port) ->
 					<<Author:AuthorLen/binary-unit:8, EmailLen:32/big, Rest6/binary>> = Rest5,
 					<<Email:EmailLen/binary-unit:8, TreeOid:40/binary-unit:8>> = Rest6,
 					Rec = #gitcommit{msg = Msg, parents = Parents, author = Author, email = Email, tree_oid = TreeOid},
-					{reply, {ok, Rec}, Port};
+					{reply, {ok, Rec}, State};
 				?ERROR_STRERROR ->
 					<<Errno:32/big-signed, Message/binary>> = Rest,
-					{reply, {error, Errno, Message}, Port};
+					{reply, {error, Errno, Message}, State};
 				?GIT_ENOTFOUND ->
-					{reply, {error, notfound}, Port};
+					{reply, {error, notfound}, State};
 				_ ->
-					{reply, {error, unknown}, Port}
+					{reply, {error, unknown}, State}
 			end
 	after 1000 ->
-		{reply, {error, timeout}, Port}
+		{reply, {error, timeout}, State}
 	end;
 
-handle_call({get_tree, Oid}, _From, Port) ->
+handle_call({get_tree, Oid}, _From, State) ->
+	Port = State#state.port,
 	BOid = check_bin(Oid),
 	Port ! {self(), {command, <<?OP_GETTREE:8, BOid/binary>>}},
 	receive
@@ -367,20 +377,21 @@ handle_call({get_tree, Oid}, _From, Port) ->
 			<<ErrCode:32/big-signed, Rest/binary>> = Data,
 			case ErrCode of
 				?GIT_OK ->
-					{reply, {ok, tree_binary_to_list(Rest, [])}, Port};
+					{reply, {ok, tree_binary_to_list(Rest, [])}, State};
 				?GIT_ENOTFOUND ->
-					{reply, {error, notfound}, Port};
+					{reply, {error, notfound}, State};
 				?ERROR_STRERROR ->
 					<<Errno:32/big-signed, Message/binary>> = Rest,
-					{reply, {error, Errno, Message}, Port};
+					{reply, {error, Errno, Message}, State};
 				_ ->
-					{reply, {error, unknown}, Port}
+					{reply, {error, unknown}, State}
 			end
 	after 1000 ->
-		{reply, {error, timeout}, Port}
+		{reply, {error, timeout}, State}
 	end;
 
-handle_call({get_ref, Ref}, _From, Port) ->
+handle_call({get_ref, Ref}, _From, State) ->
+	Port = State#state.port,
 	BRef = check_bin(Ref),
 	Port ! {self(), {command, <<?OP_GETREF:8, BRef/binary>>}},
 	receive
@@ -388,41 +399,45 @@ handle_call({get_ref, Ref}, _From, Port) ->
 			<<ErrCode:32/big-signed, Rest/binary>> = Data,
 			case ErrCode of
 				?GIT_OK ->
-					{reply, {ok, Rest}, Port};
+					{reply, {ok, Rest}, State};
 				?GIT_ENOTFOUND ->
-					{reply, {error, notfound}, Port};
+					{reply, {error, notfound}, State};
 				?ERROR_STRERROR ->
 					<<Errno:32/big-signed, Message/binary>> = Rest,
-					{reply, {error, Errno, Message}, Port};
+					{reply, {error, Errno, Message}, State};
 				_ ->
-					{reply, {error, unknown}, Port}
+					{reply, {error, unknown}, State}
 			end
 	after 1000 ->
-		{reply, {error, timeout}, Port}
+		{reply, {error, timeout}, State}
 	end.
 
 %% @private
-handle_cast(close, Port) ->
+handle_cast(close, State) ->
+	Port = State#state.port,
 	Port ! {self(), close},
 	receive
 		{Port, closed} ->
-			{stop, normal, Port}
+			{stop, normal, State}
 	end;
 
-handle_cast(_, Port) ->
-	{noreply, Port}.
+handle_cast(_, State) ->
+	{noreply, State}.
 
 %% @private
-handle_info({'EXIT', Port, _Reason}, Port) ->
-	{stop, port_terminated, Port};
+handle_info({'EXIT', Port, _Reason}, State) ->
+	#state{exec=Exec,path=Path} = State,
+	NewPort = open_port({spawn_executable, Exec},
+						[binary, {packet, 4}, {args, [Path]}]),
+	{noreply, State#state{port=NewPort}};
 
-handle_info(_, Port) ->
-	{noreply, Port}.
+handle_info(_, State) ->
+	{noreply, State}.
 
 %% @private
-terminate(_Reason, _Dicts) ->
+terminate(_Reason, _State) ->
 	ok.
 
 %% @private
-code_change(_OldVsn, Dicts, _Extra) ->
-	{ok, Dicts}.
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
