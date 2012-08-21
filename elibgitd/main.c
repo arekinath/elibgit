@@ -75,6 +75,22 @@ die_strerror(int eno)
 }
 
 int
+do_read(int fd, void *vbuf, int len)
+{
+	char *buf = (char *)vbuf;
+	char *end = buf + len;
+	int done = len;
+	while (buf < end) {
+		int ret = read(fd, buf, len);
+		if (ret <= 0)
+			return ret;
+		buf += ret;
+		len -= ret;
+	}
+	return done;
+}
+
+int
 read_oid(git_oid *oid, uint32_t len)
 {
 	char *buf;
@@ -83,7 +99,7 @@ read_oid(git_oid *oid, uint32_t len)
 	buf = malloc(len + 1);
 	if (buf == NULL)
 		die_strerror(ENOMEM);
-	if (read(0, buf, len) != (len))
+	if (do_read(0, buf, len) != (len))
 		die_strerror(errno);
 	buf[len] = 0;
 
@@ -100,13 +116,13 @@ uint32_t
 read_string(char **buf)
 {
 	uint32_t len;
-	if (read(0, &len, sizeof(len)) != sizeof(len))
+	if (do_read(0, &len, sizeof(len)) != sizeof(len))
 		die_strerror(errno);
 	len = ntohl(len);
 	*buf = malloc(len + 1);
 	if (*buf == NULL)
 		die_strerror(ENOMEM);
-	if (read(0, *buf, len) != len)
+	if (do_read(0, *buf, len) != len)
 		die_strerror(errno);
 	buf[0][len] = 0;
 
@@ -137,7 +153,7 @@ handle_createcommit(git_repository *repo, uint32_t inlen)
 		return;
 	}
 
-	if (read(0, &parents, sizeof(parents)) != sizeof(parents))
+	if (do_read(0, &parents, sizeof(parents)) != sizeof(parents))
 		die_strerror(errno);
 
 	for (i = 0; i < parents; ++i) {
@@ -200,7 +216,7 @@ handle_createblob(git_repository *repo, uint32_t inlen)
 	buf = malloc(inlen);
 	if (buf == NULL)
 		die_strerror(ENOMEM);
-	if (read(0, buf, inlen) != inlen)
+	if (do_read(0, buf, inlen) != inlen)
 		die_strerror(errno);
 
 	git_oid oid;
@@ -233,7 +249,7 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 	git_tree *origin = NULL;
 	git_treebuilder *builder = NULL;
 
-	if (read(0, &useorigin, sizeof(useorigin)) != sizeof(useorigin))
+	if (do_read(0, &useorigin, sizeof(useorigin)) != sizeof(useorigin))
 		die_strerror(errno);
 
 	if (useorigin) {
@@ -256,19 +272,19 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 	}
 
 	/* do remove operations */
-	if (read(0, &count, sizeof(count)) != sizeof(count))
+	if (do_read(0, &count, sizeof(count)) != sizeof(count))
 		die_strerror(errno);
 	count = ntohl(count);
 
 	for (i = 0; i < count; ++i) {
-		if (read(0, &len, sizeof(len)) != sizeof(len))
+		if (do_read(0, &len, sizeof(len)) != sizeof(len))
 			die_strerror(errno);
 		len = ntohl(len);
 
 		buf = malloc(len+1);
 		if (buf == NULL)
 			die_strerror(ENOMEM);
-		if (read(0, buf, len) != len)
+		if (do_read(0, buf, len) != len)
 			die_strerror(errno);
 		buf[len] = 0;
 
@@ -282,19 +298,19 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 	}
 
 	/* do insert operations */
-	if (read(0, &count, sizeof(count)) != sizeof(count))
+	if (do_read(0, &count, sizeof(count)) != sizeof(count))
 		die_strerror(errno);
 	count = ntohl(count);
 
 	for (i = 0; i < count; ++i) {
-		if (read(0, &len, sizeof(len)) != sizeof(len))
+		if (do_read(0, &len, sizeof(len)) != sizeof(len))
 			die_strerror(errno);
 		len = ntohl(len);
 
 		buf = malloc(len+1);
 		if (buf == NULL)
 			die_strerror(ENOMEM);
-		if (read(0, buf, len) != len)
+		if (do_read(0, buf, len) != len)
 			die_strerror(errno);
 		buf[len] = 0;
 
@@ -305,7 +321,7 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 		}
 
 		uint32_t attrs;
-		if (read(0, &attrs, sizeof(attrs)) != sizeof(attrs))
+		if (do_read(0, &attrs, sizeof(attrs)) != sizeof(attrs))
 			die_strerror(errno);
 		attrs = ntohl(attrs);
 
@@ -509,7 +525,7 @@ handle_getref(git_repository *repo, uint32_t inlen)
 	buf = malloc(inlen + 1);
 	if (buf == NULL)
 		die_strerror(ENOMEM);
-	if (read(0, buf, inlen) != inlen)
+	if (do_read(0, buf, inlen) != inlen)
 		die_strerror(errno);
 	buf[inlen] = 0;
 
@@ -559,10 +575,10 @@ main(int argc, char *argv[])
 	// 1 = stdout
 	while (1) {
 		/* erlang writes the length first in packet mode. */
-		if (read(0, &len, sizeof(uint32_t)) != sizeof(uint32_t))
+		if (do_read(0, &len, sizeof(uint32_t)) != sizeof(uint32_t))
 			break;
 		len = ntohl(len) - sizeof(char);
-		if (read(0, &oper, sizeof(char)) != sizeof(char))
+		if (do_read(0, &oper, sizeof(char)) != sizeof(char))
 			break;
 		switch (oper) {
 		case OP_GETREF:
