@@ -34,6 +34,7 @@
 #include <git2.h>
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
 
 /* for htonl */
 #include <arpa/inet.h>
@@ -45,6 +46,7 @@
 #define OP_BUILDTREE		5
 #define OP_CREATEBLOB		6
 #define OP_CREATECOMMIT		7
+#define ERROR_STRERROR		(-65)
 
 void
 write_error(int err)
@@ -57,6 +59,21 @@ write_error(int err)
 	write(1, &err, sizeof(int));
 }
 
+void
+die_strerror(int eno)
+{
+	int err = ERROR_STRERROR;
+	char *msg = strerror(eno);
+	uint32_t len = htonl(sizeof(int)*2 + strlen(msg));
+	eno = htonl(eno);
+	err = htonl(err);
+	write(1, &len, sizeof(len));
+	write(1, &err, sizeof(err));
+	write(1, &eno, sizeof(eno));
+	write(1, msg, strlen(msg));
+	exit(2);
+}
+
 int
 read_oid(git_oid *oid, uint32_t len)
 {
@@ -65,9 +82,9 @@ read_oid(git_oid *oid, uint32_t len)
 
 	buf = malloc(len + 1);
 	if (buf == NULL)
-		exit(2);
+		die_strerror(ENOMEM);
 	if (read(0, buf, len) != (len))
-		exit(2);
+		die_strerror(errno);
 	buf[len] = 0;
 
 	if ((err = git_oid_fromstr(oid, buf))) {
@@ -84,13 +101,13 @@ read_string(char **buf)
 {
 	uint32_t len;
 	if (read(0, &len, sizeof(len)) != sizeof(len))
-		exit(2);
+		die_strerror(errno);
 	len = ntohl(len);
 	*buf = malloc(len + 1);
 	if (*buf == NULL)
-		exit(2);
+		die_strerror(ENOMEM);
 	if (read(0, *buf, len) != len)
-		exit(2);
+		die_strerror(errno);
 	buf[0][len] = 0;
 
 	return len;
@@ -121,7 +138,7 @@ handle_createcommit(git_repository *repo, uint32_t inlen)
 	}
 
 	if (read(0, &parents, sizeof(parents)) != sizeof(parents))
-		exit(2);
+		die_strerror(errno);
 
 	for (i = 0; i < parents; ++i) {
 		if ((err = read_oid(&parent_oid[i], GIT_OID_HEXSZ))) {
@@ -182,9 +199,9 @@ handle_createblob(git_repository *repo, uint32_t inlen)
 
 	buf = malloc(inlen);
 	if (buf == NULL)
-		exit(2);
+		die_strerror(ENOMEM);
 	if (read(0, buf, inlen) != inlen)
-		exit(2);
+		die_strerror(errno);
 
 	git_oid oid;
 	if ((err = git_blob_create_frombuffer(&oid, repo, buf, inlen))) {
@@ -217,7 +234,7 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 	git_treebuilder *builder = NULL;
 
 	if (read(0, &useorigin, sizeof(useorigin)) != sizeof(useorigin))
-		exit(2);
+		die_strerror(errno);
 
 	if (useorigin) {
 		git_oid origin_oid;
@@ -240,19 +257,19 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 
 	/* do remove operations */
 	if (read(0, &count, sizeof(count)) != sizeof(count))
-		exit(2);
+		die_strerror(errno);
 	count = ntohl(count);
 
 	for (i = 0; i < count; ++i) {
 		if (read(0, &len, sizeof(len)) != sizeof(len))
-			exit(2);
+			die_strerror(errno);
 		len = ntohl(len);
 
 		buf = malloc(len+1);
 		if (buf == NULL)
-			exit(2);
+			die_strerror(ENOMEM);
 		if (read(0, buf, len) != len)
-			exit(2);
+			die_strerror(errno);
 		buf[len] = 0;
 
 		if ((err = git_treebuilder_remove(builder, buf))) {
@@ -266,19 +283,19 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 
 	/* do insert operations */
 	if (read(0, &count, sizeof(count)) != sizeof(count))
-		exit(2);
+		die_strerror(errno);
 	count = ntohl(count);
 
 	for (i = 0; i < count; ++i) {
 		if (read(0, &len, sizeof(len)) != sizeof(len))
-			exit(2);
+			die_strerror(errno);
 		len = ntohl(len);
 
 		buf = malloc(len+1);
 		if (buf == NULL)
-			exit(2);
+			die_strerror(ENOMEM);
 		if (read(0, buf, len) != len)
-			exit(2);
+			die_strerror(errno);
 		buf[len] = 0;
 
 		git_oid oid;
@@ -289,7 +306,7 @@ handle_buildtree(git_repository *repo, uint32_t inlen)
 
 		uint32_t attrs;
 		if (read(0, &attrs, sizeof(attrs)) != sizeof(attrs))
-			exit(2);
+			die_strerror(errno);
 		attrs = ntohl(attrs);
 
 		if ((err = git_treebuilder_insert(NULL, builder, buf, &oid, attrs))) {
@@ -491,9 +508,9 @@ handle_getref(git_repository *repo, uint32_t inlen)
 
 	buf = malloc(inlen + 1);
 	if (buf == NULL)
-		exit(2);
+		die_strerror(ENOMEM);
 	if (read(0, buf, inlen) != inlen)
-		exit(2);
+		die_strerror(errno);
 	buf[inlen] = 0;
 
 	if ((err = git_reference_lookup(&ref, repo, buf))) {
@@ -502,7 +519,7 @@ handle_getref(git_repository *repo, uint32_t inlen)
 	}
 
 	if ((oid = git_reference_oid(ref)) == NULL)
-		exit(2);
+		die_strerror(ENOMEM);
 
 	char outbuf[GIT_OID_HEXSZ+1];
 	git_oid_tostr(outbuf, sizeof(outbuf), oid);

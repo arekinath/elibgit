@@ -48,6 +48,8 @@
 -define(GIT_PASSTHROUGH, 	-30).
 -define(GIT_REVWALKOVER, 	-31).
 
+-define(ERROR_STRERROR,		-65).
+
 %% git tree entry types
 -define(GIT_OBJ_ANY,		-2).
 -define(GIT_OBJ_BAD,		-1).

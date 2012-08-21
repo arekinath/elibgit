@@ -246,6 +246,9 @@ handle_call({create_commit, Ref, Author, Email, Message, Parents, Tree}, _From, 
 			case ErrCode of
 				?GIT_OK ->
 					{reply, {ok, Rest}, Port};
+				?ERROR_STRERROR ->
+					<<Errno:32/big-signed, Message/binary>> = Rest,
+					{reply, {error, Errno, Message}, Port};
 				_ ->
 					{reply, {error, unknown}, Port}
 			end
@@ -278,6 +281,9 @@ handle_call({build_tree, Origin, Removes, Inserts}, _From, Port) ->
 			case ErrCode of
 				?GIT_OK ->
 					{reply, {ok, Rest}, Port};
+				?ERROR_STRERROR ->
+					<<Errno:32/big-signed, Message/binary>> = Rest,
+					{reply, {error, Errno, Message}, Port};
 				_ ->
 					{reply, {error, unknown}, Port}
 			end
@@ -294,6 +300,9 @@ handle_call({create_blob, BlobData}, _From, Port) ->
 			case ErrCode of
 				?GIT_OK ->
 					{reply, {ok, Rest}, Port};
+				?ERROR_STRERROR ->
+					<<Errno:32/big-signed, Message/binary>> = Rest,
+					{reply, {error, Errno, Message}, Port};
 				_ ->
 					{reply, {error, unknown}, Port}
 			end
@@ -312,6 +321,9 @@ handle_call({get_blob, Oid}, _From, Port) ->
 					{reply, {ok, Rest}, Port};
 				?GIT_ENOTFOUND ->
 					{reply, {error, notfound}, Port};
+				?ERROR_STRERROR ->
+					<<Errno:32/big-signed, Message/binary>> = Rest,
+					{reply, {error, Errno, Message}, Port};
 				_ ->
 					{reply, {error, unknown}, Port}
 			end
@@ -335,6 +347,9 @@ handle_call({get_commit, Oid}, _From, Port) ->
 					<<Email:EmailLen/binary-unit:8, TreeOid:40/binary-unit:8>> = Rest6,
 					Rec = #gitcommit{msg = Msg, parents = Parents, author = Author, email = Email, tree_oid = TreeOid},
 					{reply, {ok, Rec}, Port};
+				?ERROR_STRERROR ->
+					<<Errno:32/big-signed, Message/binary>> = Rest,
+					{reply, {error, Errno, Message}, Port};
 				?GIT_ENOTFOUND ->
 					{reply, {error, notfound}, Port};
 				_ ->
@@ -355,6 +370,9 @@ handle_call({get_tree, Oid}, _From, Port) ->
 					{reply, {ok, tree_binary_to_list(Rest, [])}, Port};
 				?GIT_ENOTFOUND ->
 					{reply, {error, notfound}, Port};
+				?ERROR_STRERROR ->
+					<<Errno:32/big-signed, Message/binary>> = Rest,
+					{reply, {error, Errno, Message}, Port};
 				_ ->
 					{reply, {error, unknown}, Port}
 			end
@@ -373,6 +391,9 @@ handle_call({get_ref, Ref}, _From, Port) ->
 					{reply, {ok, Rest}, Port};
 				?GIT_ENOTFOUND ->
 					{reply, {error, notfound}, Port};
+				?ERROR_STRERROR ->
+					<<Errno:32/big-signed, Message/binary>> = Rest,
+					{reply, {error, Errno, Message}, Port};
 				_ ->
 					{reply, {error, unknown}, Port}
 			end
