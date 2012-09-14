@@ -70,24 +70,24 @@ open(Path) ->
 %% just <code>master</code>.
 -spec elibgit:get_ref(Ref :: string() | binary(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 get_ref(Ref, {elibgit, Pid}) ->
-	gen_server:call(Pid, {get_ref, Ref}).
+	gen_server:call(Pid, {get_ref, Ref}, 20000).
 
 
 %% @doc Retrieves a tree object.
 -spec elibgit:get_tree(Oid :: git_oid(), Inst :: elibgit()) -> {ok, [git_tree_entry()]} | {error, term()}.
 get_tree(Oid, {elibgit, Pid}) ->
-	gen_server:call(Pid, {get_tree, Oid}).
+	gen_server:call(Pid, {get_tree, Oid}, 20000).
 
 
 %% @doc Retrieves a commit object.
 -spec elibgit:get_commit(Oid :: git_oid(), Inst :: elibgit()) -> {ok, git_commit()} | {error, term()}.
 get_commit(Oid, {elibgit, Pid}) ->
-	gen_server:call(Pid, {get_commit, Oid}).
+	gen_server:call(Pid, {get_commit, Oid}, 20000).
 
 %% @doc Retrieves the data inside a blob object.
 -spec elibgit:get_blob(Oid :: git_oid(), Inst :: elibgit()) -> {ok, binary()} | {error, term()}.
 get_blob(Oid, {elibgit, Pid}) ->
-	gen_server:call(Pid, {get_blob, Oid}).
+	gen_server:call(Pid, {get_blob, Oid}, 20000).
 
 %% @doc Creates a new blob in the respository, returning its new OID.
 -spec elibgit:create_blob(Data :: binary(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
@@ -108,7 +108,7 @@ create_blob(Data, {elibgit, Pid}) ->
 %% <code>{gitinsert, "bah.txt", "blob_oid_here", 0}</code>.
 -spec elibgit:build_tree(StartingPoint :: git_oid() | empty, Removes :: [git_remove_op()], Inserts :: [git_insert_op()], Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 build_tree(StartingPoint, Removes, Inserts, {elibgit, Pid}) ->
-	gen_server:call(Pid, {build_tree, StartingPoint, Removes, Inserts}).
+	gen_server:call(Pid, {build_tree, StartingPoint, Removes, Inserts}, 20000).
 
 %% @doc Creates a new commit and updates a ref to point at it.
 %%
@@ -116,7 +116,7 @@ build_tree(StartingPoint, Removes, Inserts, {elibgit, Pid}) ->
 %% is a really Bad Idea.
 -spec elibgit:create_commit(Ref :: filename(), Author :: string() | binary(), Email :: string() | binary(), Message :: string() | binary(), Parents :: [git_oid()], Tree :: git_oid(), Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
 create_commit(Ref, Author, Email, Message, Parents, Tree, {elibgit, Pid}) ->
-	gen_server:call(Pid, {create_commit, Ref, Author, Email, Message, Parents, Tree}).
+	gen_server:call(Pid, {create_commit, Ref, Author, Email, Message, Parents, Tree}, 20000).
 
 %% @doc Closes a repository instance.
 -spec elibgit:close(Inst :: elibgit()) -> ok | {error, term()}.
