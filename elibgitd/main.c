@@ -438,7 +438,7 @@ handle_getcommit(git_repository *repo, uint32_t inlen)
 	write(1, &len, sizeof(len));
 
 	for (i = 0; i < git_commit_parentcount(commit); ++i) {
-		const git_oid *oid = git_commit_parent_oid(commit, i);
+		const git_oid *oid = git_commit_parent_id(commit, i);
 		char outbuf[GIT_OID_HEXSZ+1];
 		git_oid_tostr(outbuf, sizeof(outbuf), oid);
 		write(1, outbuf, GIT_OID_HEXSZ);
@@ -452,7 +452,7 @@ handle_getcommit(git_repository *repo, uint32_t inlen)
 	write(1, &len, sizeof(len));
 	write(1, sig->email, ntohl(len));
 
-	const git_oid *toid = git_commit_tree_oid(commit);
+	const git_oid *toid = git_commit_tree_id(commit);
 	char toutbuf[GIT_OID_HEXSZ+1];
 	git_oid_tostr(toutbuf, sizeof(toutbuf), toid);
 	write(1, toutbuf, GIT_OID_HEXSZ);
@@ -517,6 +517,7 @@ void
 handle_getref(git_repository *repo, uint32_t inlen)
 {
 	git_reference *ref = NULL;
+	git_reference *rref = NULL;
 	int32_t err;
 	uint32_t len, tlen;
 	char *buf;
@@ -534,7 +535,12 @@ handle_getref(git_repository *repo, uint32_t inlen)
 		return;
 	}
 
-	if ((oid = git_reference_oid(ref)) == NULL)
+	if ((err = git_reference_resolve(&rref, ref))) {
+		write_error(err);
+		return;
+	}
+
+	if ((oid = git_reference_target(rref)) == NULL)
 		die_strerror(ENOMEM);
 
 	char outbuf[GIT_OID_HEXSZ+1];
@@ -552,6 +558,7 @@ handle_getref(git_repository *repo, uint32_t inlen)
 
 	free(buf);
 	git_reference_free(ref);
+	git_reference_free(rref);
 }
 
 int
