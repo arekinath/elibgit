@@ -42,7 +42,7 @@
 -module(elibgit).
 -behaviour(gen_server).
 
--export([open/1, get_ref/2, get_tree/2, get_commit/2, get_blob/2, create_blob/2, build_tree/4, create_commit/7, close/1]).
+-export([open/1, get_ref/2, get_tree/2, get_commit/2, get_blob/2, create_blob/2, build_tree/4, create_commit/7, close/1, read_file/3, write_files/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("elibgit.hrl").
@@ -62,7 +62,6 @@ open(Path) ->
 		Other ->
 			Other
 	end.
-
 
 %% @doc Resolves a 'ref' in the repository.
 %%
@@ -122,6 +121,101 @@ create_commit(Ref, Author, Email, Message, Parents, Tree, {elibgit, Pid}) ->
 -spec elibgit:close(Inst :: elibgit()) -> ok | {error, term()}.
 close({elibgit, Pid}) ->
 	gen_server:cast(Pid, close).
+
+% Turns a path into a list of {Name, GitOid} tuples.
+-spec path_to_trees(Repo :: elibgit(), Tree :: [#gitent{}], Path :: [string()], Initial :: []) -> [{string(), git_oid()}].
+path_to_trees(_Repo, _Tree, [_File], SoFar) ->
+	SoFar;
+path_to_trees(Repo, Tree, [Next | Rest], SoFar) ->
+	NextBin = list_to_binary(Next),
+	case lists:filter(fun(Ent) -> (Ent#gitent.type =:= tree) andalso (Ent#gitent.name =:= NextBin) end, Tree) of
+		[SubtreeEnt] ->
+			{ok, Subtree} = Repo:get_tree(SubtreeEnt#gitent.oid),
+			NewSoFar = [{Next, SubtreeEnt#gitent.oid}] ++ SoFar,
+			path_to_trees(Repo, Subtree, Rest, NewSoFar);
+		_ ->
+			NewSoFar = [{Next, none}] ++ SoFar,
+			path_to_trees(Repo, [], Rest, NewSoFar)
+	end.
+
+% Recursively constructs a tree back to the root.
+-spec new_tree_with(Repo :: elibgit(), LastName :: string(), LastOid :: git_oid(), Attrs :: integer(), Path :: [{Name :: string(), git_oid()}]) -> git_oid().
+new_tree_with(_, _, LastOid, _, []) ->
+	LastOid;
+new_tree_with(Repo, LastName, LastOid, Attrs, [Next | Rest]) ->
+	{Name, OldOid} = Next,
+	{ok, NewOid} = if LastOid =:= delete ->
+		Repo:build_tree(OldOid, [#gitremove{name = LastName}], []);
+	true ->
+		Repo:build_tree(OldOid, [], [#gitinsert{name = LastName, oid = LastOid, attrs = Attrs}])
+	end,
+	%error_logger:info_report([{build_from, OldOid}, {with, {LastName, LastOid}}, {makes, NewOid}]),
+	new_tree_with(Repo, Name, NewOid, 8#040000, Rest).
+
+% Builds a new tree with the data at Path replaced by Data.
+-spec build_tree_path(Repo :: elibgit(), BaseTree :: git_oid(), Path :: [string()], Data :: delete | binary()) -> git_oid().
+build_tree_path(Repo, TreeOid, Path, Data) ->
+	{ok, Tree} = Repo:get_tree(TreeOid),
+	PathOids = path_to_trees(Repo, Tree, Path, []) ++ [{"root", TreeOid}],
+	if is_atom(Data) ->
+		new_tree_with(Repo, lists:last(Path), delete, 0, PathOids);
+	true ->
+		{ok, BlobOid} = Repo:create_blob(Data),
+		new_tree_with(Repo, lists:last(Path), BlobOid, 8#100644, PathOids)
+	end.
+
+%% @doc High-level function for reading a file in a tree by its path
+%%
+%% This function walks down a tree to a given relative path and retrieves
+%% the blob object stored there.
+-spec elibgit:read_file(Tree :: git_oid(), Path :: [string()], Inst :: elibgit()) -> {ok, binary()} | {error, term()}.
+read_file(TreeOid, Path, Repo = {elibgit, _Pid}) ->
+	case (catch (begin
+		Kids = case lists:reverse(Path) of
+			[Name] ->
+				{ok, Tree} = Repo:get_tree(TreeOid),
+				Tree;
+			[Name | Rest] ->
+				{ok, Tree} = Repo:get_tree(TreeOid),
+				lists:foldr(fun(DirName, Subtree) ->
+					case lists:filter(fun(Ent) -> (Ent#gitent.type =:= tree) andalso (Ent#gitent.name =:= list_to_binary(DirName)) end, Subtree) of
+						[#gitent{oid = NewOid}] ->
+							{ok, NewSubtree} = Repo:get_tree(NewOid),
+							NewSubtree;
+						_ ->
+							error({not_found, DirName})
+					end
+				end, Tree, Rest)
+		end,
+		case lists:filter(fun(Ent) -> Ent#gitent.name =:= list_to_binary(lists:last(Path)) end, Kids) of
+			[#gitent{type = blob, oid = BlobOid}] ->
+				Repo:get_blob(BlobOid);
+			[#gitent{}] ->
+				{error, not_blob};
+			_ ->
+				{error, {not_found, lists:last(Path)}}
+		end
+	end)) of
+		{'EXIT', Reason} ->
+			{error, Reason};
+		Other ->
+			Other
+	end.
+
+%% @doc High-level function for writing files in a tree by their path
+%%
+%% This function takes a base tree and writes files at a given relative path
+%% with new data, returning a new tree with changes made.
+-spec elibgit:write_files(BaseTree :: git_oid(), Files :: [{Path :: [string()], Data :: delete | binary()}], Inst :: elibgit()) -> {ok, git_oid()} | {error, term()}.
+write_files(InTree, Files, Repo = {elibgit, _Pid}) ->
+	case (catch (lists:foldl(fun({Path, Data}, Tree) ->
+		build_tree_path(Repo, Tree, Path, Data)
+	end, InTree, Files))) of
+		{'EXIT', Reason} ->
+			{error, Reason};
+		Oid ->
+			{ok, Oid}
+	end.
 
 %% gen_server stuff
 %% ===
@@ -425,7 +519,7 @@ handle_cast(_, State) ->
 	{noreply, State}.
 
 %% @private
-handle_info({'EXIT', Port, _Reason}, State) ->
+handle_info({'EXIT', _Port, _Reason}, State) ->
 	#state{exec=Exec,path=Path} = State,
 	NewPort = open_port({spawn_executable, Exec},
 						[binary, {packet, 4}, {args, [Path]}]),
